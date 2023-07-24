@@ -14,38 +14,72 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
 
- const api = new Api();
+import {
+    __,
+    allPass,
+    andThen,
+    assoc,
+    compose,
+    concat,
+    gt,
+    ifElse,
+    length,
+    lt,
+    mathMod,
+    otherwise,
+    partial,
+    prop,
+    tap,
+    test,
+} from "ramda";
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+import Api from "../tools/api";
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+const API_TECH_URL = "https://api.tech/numbers/base";
+const ANIMALS_TECH_URL = "https://animals.tech/";
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+const api = new Api();
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+const processSequence = ({ value, writeLog, handleSuccess, handleError }) => {
+    const process = compose(
+        otherwise(handleError),
+        andThen(handleSuccess),
+        andThen(compose(String, prop("result"))),
+        andThen(api.get(__, {})),
+        andThen(concat(ANIMALS_TECH_URL)),
+        andThen(tap(writeLog)),
+        andThen(compose(String, mathMod(__, 3))),
+        andThen(tap(writeLog)),
+        andThen((num) => num ** 2),
+        // writeLog("ThirdLog");
+        andThen(tap(writeLog)),
+        andThen(length),
+        // writeLog("SecondLog");
+        andThen(tap(writeLog)),
+        andThen(compose(String, prop("result"))),
+        // api.get("https://api.tech/numbers/base", {
+        compose(
+            api.get(API_TECH_URL),
+            assoc("number", __, { from: 10, to: 2 })
+        ),
+        // writeLog(value);
+        tap(writeLog),
+        compose(Math.round, Number)
+    );
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
-
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+    compose(
+        ifElse(
+            allPass([
+                compose(gt(__, 2), length),
+                compose(lt(__, 10), length),
+                test(/^[0-9]+\.?[0-9]+$/),
+            ]),
+            process,
+            partial(handleError, ["ValidationError"])
+        ),
+        tap(writeLog)
+    )(value);
+};
 
 export default processSequence;
